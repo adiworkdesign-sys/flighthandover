@@ -21,6 +21,48 @@ function useBreakpoint() {
   return { isMobile: w < 768, isTablet: w >= 768 && w < 1024, isDesktop: w >= 1024 };
 }
 
+function Breadcrumb({ steps, current }: { steps: string[]; current: number }) {
+  return (
+    <div style={{
+      background: DS.white,
+      borderBottom: `1px solid ${DS.n100}`,
+      padding: '0 20px',
+      height: 52,
+      display: 'flex',
+      alignItems: 'center',
+      gap: 6,
+      overflowX: 'auto',
+      whiteSpace: 'nowrap',
+      scrollbarWidth: 'none',
+    }}>
+      <style>{`.bmt-breadcrumb::-webkit-scrollbar { display: none; }`}</style>
+      {steps.map((step, i) => {
+        const isActive = i === current;
+        const isDone = i < current;
+        const dotBg = isDone ? DS.successBg : isActive ? DS.primary : DS.n50;
+        const dotColor = isDone ? DS.successText : isActive ? DS.white : DS.n600;
+        const labelColor = isActive ? DS.n900 : isDone ? DS.successText : DS.n600;
+        const connectorColor = i < current ? DS.success : DS.n300;
+        return (
+          <div key={step} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ width: 20, height: 20, borderRadius: '50%', background: dotBg, border: `1px solid ${isDone ? DS.success : isActive ? DS.primary : DS.n200}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: dotColor, fontWeight: 700, fontFamily: 'Helvetica Neue', flexShrink: 0 }}>
+                {isDone ? '✓' : i + 1}
+              </div>
+              <span style={{ fontFamily: 'Helvetica Neue', fontWeight: isActive ? 700 : 500, fontSize: 12, color: labelColor }}>{step}</span>
+            </div>
+            {i < steps.length - 1 && (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                <path d="M9 18l6-6-6-6" stroke={connectorColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 const AIRPORTS = [
   { code: 'CGK', city: 'Jakarta', name: 'Soekarno-Hatta International', icon: '🏙️' },
   { code: 'DPS', city: 'Denpasar', name: 'Ngurah Rai International', icon: '🌴' },
@@ -559,86 +601,109 @@ export default function FlightHomePage() {
     setFlightView('booking');
   };
 
+  const isRoundTrip = searchResult?.tripType === 'roundtrip';
+  const FLIGHT_STEPS_OW = ['Pilih Pergi', 'Pilih Tarif', 'Pemesanan', 'Pembayaran', 'E-Voucher'];
+  const FLIGHT_STEPS_RT = ['Pilih Pergi', 'Pilih Pulang', 'Pilih Tarif', 'Pemesanan', 'Pembayaran', 'E-Voucher'];
+  const flightSteps = isRoundTrip ? FLIGHT_STEPS_RT : FLIGHT_STEPS_OW;
+  const flightStepIndex = isRoundTrip
+    ? (flightView === 'results' ? (flightMode === 'return' ? 1 : 0) : flightView === 'fare' ? 2 : flightView === 'booking' ? 3 : flightView === 'payment' ? 4 : 5)
+    : (flightView === 'results' ? 0 : flightView === 'fare' ? 1 : flightView === 'booking' ? 2 : flightView === 'payment' ? 3 : 4);
+
   if (flightView === 'confirmation' && confirmationData) {
     return (
-      <ConfirmationPage
-        bookingData={confirmationData}
-        onBackHome={() => {
-          setFlightView('results');
-          setSearchResult(null);
-          setSelectedFlight(null);
-          setSelectedReturnFlight(null);
-          setSelectedFare(null);
-          setBookingData(null);
-          setConfirmationData(null);
-        }}
-      />
+      <>
+        <Breadcrumb steps={flightSteps} current={flightStepIndex} />
+        <ConfirmationPage
+          bookingData={confirmationData}
+          onBackHome={() => {
+            setFlightView('results');
+            setSearchResult(null);
+            setSelectedFlight(null);
+            setSelectedReturnFlight(null);
+            setSelectedFare(null);
+            setBookingData(null);
+            setConfirmationData(null);
+          }}
+        />
+      </>
     );
   }
 
   if (flightView === 'payment' && bookingData) {
     return (
-      <PaymentPage
-        bookingData={bookingData}
-        onPaySuccess={(orderId) => {
-          setConfirmationData({ ...(bookingData as unknown as ConfirmationBookingData), orderId });
-          setFlightView('confirmation');
-        }}
-        onBack={() => setFlightView('booking')}
-      />
+      <>
+        <Breadcrumb steps={flightSteps} current={flightStepIndex} />
+        <PaymentPage
+          bookingData={bookingData}
+          onPaySuccess={(orderId) => {
+            setConfirmationData({ ...(bookingData as unknown as ConfirmationBookingData), orderId });
+            setFlightView('confirmation');
+          }}
+          onBack={() => setFlightView('booking')}
+        />
+      </>
     );
   }
 
   if (searchResult && flightView === 'booking' && selectedFlight && selectedFare) {
     return (
-      <FlightBookingPage
-        flight={selectedFlight}
-        returnFlight={selectedReturnFlight}
-        fareData={selectedFare}
-        searchParams={searchResult}
-        onConfirm={(data) => {
-          setBookingData(data as PaymentBookingData);
-          setFlightView('payment');
-        }}
-        onBack={() => setFlightView('fare')}
-      />
+      <>
+        <Breadcrumb steps={flightSteps} current={flightStepIndex} />
+        <FlightBookingPage
+          flight={selectedFlight}
+          returnFlight={selectedReturnFlight}
+          fareData={selectedFare}
+          searchParams={searchResult}
+          onConfirm={(data) => {
+            setBookingData(data as PaymentBookingData);
+            setFlightView('payment');
+          }}
+          onBack={() => setFlightView('fare')}
+        />
+      </>
     );
   }
 
   if (searchResult && flightView === 'fare' && selectedFlight) {
     return (
-      <FlightFarePage
-        flight={selectedFlight}
-        returnFlight={selectedReturnFlight}
-        searchParams={searchResult}
-        onSelectFare={handleSelectFare}
-        onBack={() => {
-          setFlightView('results');
-          if (searchResult.tripType === 'roundtrip') {
-            setFlightMode('return');
-            setSelectedReturnFlight(null);
-          }
-        }}
-      />
+      <>
+        <Breadcrumb steps={flightSteps} current={flightStepIndex} />
+        <FlightFarePage
+          flight={selectedFlight}
+          returnFlight={selectedReturnFlight}
+          searchParams={searchResult}
+          onSelectFare={handleSelectFare}
+          onBack={() => {
+            setFlightView('results');
+            if (searchResult.tripType === 'roundtrip') {
+              setFlightMode('return');
+              setSelectedReturnFlight(null);
+            }
+          }}
+        />
+      </>
     );
   }
 
   if (searchResult) {
     return (
-      <FlightResultsPage
-        searchParams={searchResult}
-        mode={flightMode}
-        outboundFlight={selectedFlight}
-        onSelectFlight={handleSelectFlight}
-        onBack={() => {
-          if (flightMode === 'return') {
-            setFlightMode('outbound');
-            setSelectedFlight(null);
-          } else {
-            setSearchResult(null);
-          }
-        }}
-      />
+      <>
+        <Breadcrumb steps={flightSteps} current={flightStepIndex} />
+        <FlightResultsPage
+          searchParams={searchResult}
+          mode={flightMode}
+          outboundFlight={selectedFlight}
+          onSelectFlight={handleSelectFlight}
+          onBack={() => {
+            if (flightMode === 'return') {
+              setFlightMode('outbound');
+              setSelectedFlight(null);
+            } else {
+              setSearchResult(null);
+            }
+          }}
+        />
+      </>
     );
   }
 
